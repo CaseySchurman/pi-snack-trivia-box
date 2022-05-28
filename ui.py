@@ -55,7 +55,7 @@ class QuizInterface:
     if is_correct:
       self.question_window.config(bg="green")
       self.servo.open()
-      time.sleep(60)
+      self.window.after(60000)
       self.servo.close()
     else:
       self.question_window.config(bg="red")
