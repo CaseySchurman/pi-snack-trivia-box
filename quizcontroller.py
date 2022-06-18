@@ -1,44 +1,69 @@
-from urllib import request
+import requests
+import base64
 from questionmodel import Question
 
-class QuizController:
-    def __init__(self, q_list):
-        self.num = 0
-        self.question_list = q_list
-        self.current_question = None
+# We pull in 100 questions at a time
+QUESTION_COUNT = 100
 
-    def generate_question(self):
+class QuizController:
+    """
+    Handles logic for pulling questions from opentdb and decoding the base64 encoded data, checking answers, and 
+    getting the next question when user is playing the trivia game.
+    """
+
+    def __init__(self):
+        self.num = 0
+        self.question_list = []
+        self.current_question = None
+        self.get_questions()
+
+    def get_question(self):
         self.current_question = self.question_list[self.num]
         self.num += 1
-        user = input(f'Q.{self.num} {self.current_question.text} ').title()
-        #self.check_answer(user, current.answer)
+        return self.current_question.text
 
     def next_question(self):
-        for _ in self.question_list:
-            self.generate_question()
+        if self.num < QUESTION_COUNT:
+            for _ in self.question_list:
+                return self.get_question()
+            else:
+                return ""
+        else:
+            return ""
+
+    def check_answer(self, answer):
+        if answer == self.current_question.answer:
+            return True
         else:
             return False
 
-    def check_answer(self, answer):
-        correct_answer = self.current_question.answer
-        if answer == correct_answer:
-            print("Correct!\n")
-            #self.score += 1
-            #print(f"Correct, score = {self.score}/{self.num}.\n")
-        else:
-            print("Wrong!\n")
-            #print(f"Wrong, score = {self.score}/{self.num}.\n")
-
     def get_questions(self):
-        response = request.get('https://opentdb.com/api.php?amount=100&type=boolean')
+        response = requests.get(f'https://opentdb.com/api.php?amount={QUESTION_COUNT}&type=boolean&encode=base64')
         question_data  = response.json()["results"]
 
+        # Certain Q/A's don't come in as valid base64 to be decoded, so just skip if we run into those
         questions = []
         for question in question_data:
             question_text = question["question"]
+            try:
+                question_decoded = self.decode_base64(question_text)
+            except UnicodeDecodeError:
+                continue
+
             question_answer = question["correct_answer"]
-            new_question = Question(question_text, question_answer)
+            try:
+                correct_answer_decoded = self.decode_base64(question_answer)
+            except UnicodeDecodeError:
+                continue
+
+            new_question = Question(question_decoded, correct_answer_decoded)
             questions.append(new_question)
 
         self.question_list = questions
         self.num = 0
+
+    def decode_base64(self, value):
+        value_base64_bytes = value.encode("ascii")
+        value_bytes = base64.b64decode(value_base64_bytes)
+        value_decoded = value_bytes.decode("ascii")
+        return value_decoded
